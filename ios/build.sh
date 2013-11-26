@@ -27,7 +27,7 @@ popd > /dev/null
 # Build plugin
 # 
 CONFIG=Release
-TARGET=native-popup-addressbook
+TARGET=native-popup-quickLook
 BINARY=lib$TARGET.a
 OUTPUT_DIR=$path/../../build/$TARGET/ios
 
@@ -46,7 +46,7 @@ xcodebuild -project "$path/Plugin.xcodeproj" -target $TARGET -configuration $CON
 checkError
 
 # Xcode Simulator
-xcodebuild -project "$path/Plugin.xcodeproj" -target $TARGET -configuration $CONFIG -sdk iphonesimulator6.0
+xcodebuild -project "$path/Plugin.xcodeproj" -target $TARGET -configuration $CONFIG -sdk iphonesimulator6.1
 checkError
 
 # create universal binary

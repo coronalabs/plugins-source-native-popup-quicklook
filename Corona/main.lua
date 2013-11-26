@@ -1,3 +1,13 @@
+-- 
+-- Abstract: Quick Look sample app
+--  
+-- Version: 1.0
+-- 
+-- Sample code is MIT licensed, see http://www.coronalabs.com/links/code/license
+-- Copyright (C) 2013 Corona Labs Inc. All Rights Reserved.
+--
+-- Demonstrates how to use Corona to preview items with the iOS Quick Look controller
+
 local widget = require( "widget" )
 
 -- Display a background
