@@ -32,34 +32,6 @@
 
 // ----------------------------------------------------------------------------
 
-class IOSQuickLookNativePopupProvider
-{
-	public:
-		typedef IOSQuickLookNativePopupProvider Self;
-
-	public:
-		static int Open( lua_State *L );
-		static int Finalizer( lua_State *L );
-		static Self *ToLibrary( lua_State *L );
-
-	protected:
-		IOSQuickLookNativePopupProvider();
-		bool Initialize( void *platformContext );
-		
-	public:
-		UIViewController* GetAppViewController() const { return fAppViewController; }
-
-	public:
-		static int canShowPopup( lua_State *L );
-		static int showPopup( lua_State *L );
-
-	private:
-		UIViewController *fAppViewController;
-};
-
-// ----------------------------------------------------------------------------
-
-
 namespace Corona
 {
 
