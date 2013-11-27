@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		3039363117C23A9B002B2825 /* CoronaResources.bundle in Resources */ = {isa = PBXBuildFile; fileRef = 3039363017C23A9B002B2825 /* CoronaResources.bundle */; };
 		3054CC64183D076A0019242A /* QuickLook.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3054CC63183D076A0019242A /* QuickLook.framework */; };
+		30BA053318454B57000CBCC7 /* GLKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A484112315114F700074BD57 /* GLKit.framework */; };
+		30BA053518454B5D000CBCC7 /* CoreVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 30BA053418454B5D000CBCC7 /* CoreVideo.framework */; };
 		30BEBA79176F1FDE00C4AFA5 /* AdSupport.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 30BEBA78176F1FDE00C4AFA5 /* AdSupport.framework */; };
 		A447B610165D72FB009EA762 /* AppCoronaDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = A447B60F165D72FB009EA762 /* AppCoronaDelegate.mm */; };
 		A447B6671666FD02009EA762 /* MainWindow-iPad.xib in Resources */ = {isa = PBXBuildFile; fileRef = A447B6641666FD02009EA762 /* MainWindow-iPad.xib */; };
@@ -66,6 +68,7 @@
 /* Begin PBXFileReference section */
 		3039363017C23A9B002B2825 /* CoronaResources.bundle */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.plug-in"; name = CoronaResources.bundle; path = ../../../../../../../../../../Applications/CoronaEnterprise/Corona/ios/resource/CoronaResources.bundle; sourceTree = "<group>"; };
 		3054CC63183D076A0019242A /* QuickLook.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuickLook.framework; path = System/Library/Frameworks/QuickLook.framework; sourceTree = SDKROOT; };
+		30BA053418454B5D000CBCC7 /* CoreVideo.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreVideo.framework; path = System/Library/Frameworks/CoreVideo.framework; sourceTree = SDKROOT; };
 		30BEBA78176F1FDE00C4AFA5 /* AdSupport.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AdSupport.framework; path = System/Library/Frameworks/AdSupport.framework; sourceTree = SDKROOT; };
 		A447B60E165D72FB009EA762 /* AppCoronaDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AppCoronaDelegate.h; sourceTree = SOURCE_ROOT; };
 		A447B60F165D72FB009EA762 /* AppCoronaDelegate.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = AppCoronaDelegate.mm; sourceTree = SOURCE_ROOT; };
@@ -114,6 +117,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				30BA053518454B5D000CBCC7 /* CoreVideo.framework in Frameworks */,
+				30BA053318454B57000CBCC7 /* GLKit.framework in Frameworks */,
 				30BEBA79176F1FDE00C4AFA5 /* AdSupport.framework in Frameworks */,
 				A484117715128D5D0074BD57 /* AddressBook.framework in Frameworks */,
 				A484117815128D5D0074BD57 /* AddressBookUI.framework in Frameworks */,
@@ -201,6 +206,7 @@
 		A484111C15114F700074BD57 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				30BA053418454B5D000CBCC7 /* CoreVideo.framework */,
 				3054CC63183D076A0019242A /* QuickLook.framework */,
 				A484116315128D5C0074BD57 /* AddressBook.framework */,
 				A484116415128D5C0074BD57 /* AddressBookUI.framework */,
