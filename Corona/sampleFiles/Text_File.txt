@@ -1,4 +1,4 @@
-
+Sample Code: Corona SDK Quick Look Plugin
 
 
 This is some text.

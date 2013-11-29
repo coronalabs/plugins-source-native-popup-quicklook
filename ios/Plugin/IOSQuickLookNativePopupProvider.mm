@@ -25,7 +25,7 @@
 
 @property (nonatomic, assign) lua_State *luaState; // Pointer to the current Lua state
 @property (nonatomic) Corona::Lua::Ref listenerRef; // Reference to store our listener (callback) function
-@property (nonatomic, assign) NSMutableArray *filePath;
+@property (nonatomic, assign) NSMutableDictionary *fileCache; // Dictionary to store filePath's/baseDir etc.
 @end
 
 @class CoronaQuickLookDelegate;
@@ -156,14 +156,7 @@ isPreviewControllerAvailable()
 int
 IOSQuickLookNativePopupProvider::canShowPopup( lua_State *L )
 {
-	if ( isPreviewControllerAvailable() )
-	{
-		lua_pushboolean( L, true );
-	}
-	else
-	{
-		lua_pushboolean( L, false );
-	}
+	lua_pushboolean( L, isPreviewControllerAvailable() );
 	return 1;
 }
 
@@ -175,63 +168,92 @@ IOSQuickLookNativePopupProvider::showPopup( lua_State *L )
 	using namespace Corona;
 
 	Self *context = ToLibrary( L );
-	
+
 	// The result
 	int result = 0;
 
+	// If the controller is available
 	if ( context && isPreviewControllerAvailable() )
 	{
 		Self& library = * context;
-		
+
 		// Create an instance of our delegate
 		CoronaQuickLookDelegate *delegate = [[CoronaQuickLookDelegate alloc] init];
-		
+
 		// Assign the Lua State
 		delegate.luaState = L;
-		
+
 		// Assign our runtime view controller
 		UIViewController *appViewController = library.GetAppViewController();
-		
-		// Initialize the filePath array
-		delegate.filePath = [[NSMutableArray alloc] init];
-		
+
+		// Initialize our fileCache dictionary
+		delegate.fileCache = [[NSMutableDictionary alloc] init];
+
+		// Create our arrays
+		NSMutableArray *baseDirectories = [[NSMutableArray alloc] init];
+		NSMutableArray *filePaths = [[NSMutableArray alloc] init];
+		NSMutableArray *fileNames = [[NSMutableArray alloc] init];
+
 		// Set reference to onComplete function
 		if ( lua_istable( L, 2 ) )
 		{
 			// Get listener key
 			lua_getfield( L, 2, "listener" );
-			
+
 			// Set the delegates listenerRef to reference the onComplete function (if it exists)
 			if ( Lua::IsListener( L, -1, kPopupName ) )
 			{
 				//printf( "Registered listener\n" );
-				delegate.listenerRef = Lua::NewRef( L, -1 );
+				delegate.listenerRef = CoronaLuaNewRef( L, -1 );
 			}
 			// Pop listener key
 			lua_pop( L, 1 );
-			
+
 			// files key
 			lua_getfield( L, 2, "files" );
-			
+
 			// If this is a table
 			if ( lua_istable( L, -1 ) )
 			{
 				int numOfFiles = lua_objlen( L, -1 );
 				//printf( "Num tables is: %d\n", numOfFiles );
-				
+
 				if ( numOfFiles > 0 )
 				{
 					// table is an array of 'path' tables
-					for ( int i = 1; i <= numOfFiles; i++ )
+					for ( int i = 1; i <= numOfFiles; i ++ )
 					{
 						lua_rawgeti( L, -1, i );
+
+						// Get the filename key
+						lua_getfield( L, -1, "filename" );
+						// Enforce string type
+						if ( lua_type( L, -1 ) != LUA_TSTRING )
+						{
+							luaL_error( L, "filename parameter must be a string, got: %s", lua_typename( L, lua_type( L, -1 ) ) );
+						}
+						const char *filename = lua_tostring( L, -1 );
+						lua_pop( L, 1 ); // pop filename key
+
+						// Get the baseDir key
+						lua_getfield( L, -1, "baseDir" );
+						void *baseDir = lua_touserdata( L, -1 );
+						lua_pop( L, 1 ); // Pop basedir key
+
+						// Add filename/path to the array
+						[fileNames addObject:[NSString stringWithUTF8String:filename]];
+
+						// Add baseDir to the array
+						[baseDirectories addObject:[NSValue valueWithPointer:baseDir]];
+
+						// Get full path to file
 						CoronaLibraryCallFunction( L, "system", "pathForTable", "t>s", CoronaLuaNormalize( L, -1 ) );
 						const char *filePath = lua_tostring( L, -1 );
-						
+
 						// If filePath != null, add this filePath to the delegate's filePath table
 						if ( filePath )
 						{
-							[delegate.filePath addObject:[NSString stringWithUTF8String:filePath]];
+							[filePaths addObject:[NSString stringWithUTF8String:filePath]];
 							//printf( "filePath is: %s\n", filePath );
 						}
 						// Pop tables
@@ -246,15 +268,41 @@ IOSQuickLookNativePopupProvider::showPopup( lua_State *L )
 			// The item index to start the preview at (we use 0 as the default to match non Lua indices)
 			int startIndex = 0;
 			// If this is a number
-			if ( lua_isnumber( L, -1 ) )
+			luaL_checktype( L, -1, LUA_TNUMBER );
+			// Clamp the number (between 0 and the # of items in the filePaths array)
+			startIndex = MIN( MAX( luaL_checknumber( L, -1 ) - 1, 0 ), [filePaths count] );
+			//printf( "Start index val after clamping: %d", startIndex );
+			lua_pop( L, 2 ); // Pop startIndex key & options table
+			
+			// Ensure we can preview all items passed from the [lua] file table.
+			for ( int i = 0; i < [fileNames count]; i ++ )
 			{
-				// Clamp the number (between 0 and the # of items in the filePath array)
-				startIndex = MIN( MAX( luaL_checknumber( L, -1 ) - 1, 0 ), [delegate.filePath count] );
-				//printf( "Start index val after clamping: %d", startIndex );
-			}
-			lua_pop( L, 1 ); // Pop startIndex key
+				// File path to the current item
+				NSString *currentItemPath = [fileNames objectAtIndex:i];
 
-			// Create a QLPreviewController
+				// If we can't display the current item, remove it from our lists
+				if ( ! [QLPreviewController canPreviewItem:[NSURL fileURLWithPath:currentItemPath]] )
+				{
+					//NSLog( @"Can't Preview Item: %@\n", currentItemPath );
+					[filePaths removeObjectAtIndex:i];
+					[fileNames removeObjectAtIndex:i];
+					[baseDirectories removeObjectAtIndex:i];
+				}
+			}
+
+			// Add objects to our dictionary
+			[delegate.fileCache setObject:fileNames forKey:@"fileName"];
+			[delegate.fileCache setObject:baseDirectories forKey:@"baseDir"];
+			[delegate.fileCache setObject:filePaths forKey:@"filePath"];
+			// Cleanup
+			[fileNames release];
+			[baseDirectories release];
+			[filePaths release];
+			fileNames = nil;
+			baseDirectories = nil;
+			filePaths = nil;
+
+			// Create a QLPreviewController instance
 			QLPreviewController *previewController = [[QLPreviewController alloc] init];
 			previewController.delegate = delegate;
 			previewController.dataSource = delegate;
@@ -282,22 +330,24 @@ IOSQuickLookNativePopupProvider::showPopup( lua_State *L )
 - (NSInteger)numberOfPreviewItemsInPreviewController:(QLPreviewController *)controller
 {
 	// Return the number of items
-    return [self.filePath count];
+    return [[self.fileCache objectForKey:@"baseDir"] count];
 }
 
 // Current preview item
 - (id <QLPreviewItem>)previewController:(QLPreviewController *)controller previewItemAtIndex:(NSInteger)index
 {
 	// File path to the current item
-	NSString *currentItemPath = [self.filePath objectAtIndex:index];
+	NSString *currentItemPath = [[self.fileCache objectForKey:@"filePath"] objectAtIndex:index];
 
+	/*
 	// If we can't display the current item
 	if ( ! [QLPreviewController canPreviewItem:[NSURL fileURLWithPath:currentItemPath]] )
 	{
 		// TODO: Should we dispatch an event here?
-		//NSLog( @"Can't Preview Item: %@\n", currentItemPath );
+		NSLog( @"Can't Preview Item: %@\n", currentItemPath );
 	}
-	
+	*/
+
 	// Return the URL to the current file path
 	return [NSURL fileURLWithPath:currentItemPath];
 }
@@ -305,97 +355,46 @@ IOSQuickLookNativePopupProvider::showPopup( lua_State *L )
 // When the controller is requested to dismiss (i.e. when the "done" button is pressed)
 - (void)previewControllerWillDismiss:(QLPreviewController *)controller
 {
-	// The url of the current preview item
-	NSURL *currentItemUrl = (NSURL *)controller.currentPreviewItem;
-	// The filename of the current preview item
-	NSString *filename = [[currentItemUrl path] lastPathComponent];
-	
-	//NSLog( @"Current preview item index: %d\n", controller.currentPreviewItemIndex ); // Index of current preview item
-	//NSLog( @"Current preview item is: %@\n", controller.currentPreviewItem );
-	//NSLog( @"Filename is:%@\n", filename );
-		
-	// The directory path we are going to dispatch back to Lua
-	const char *directoryPath = NULL;
-	
-	// Check if file exists in resource directory
-	NSString *fileFromResourceDirectory = [[NSBundle mainBundle] pathForResource:filename ofType:nil];
-	BOOL doesFileResideInResourceDirectory = [[NSFileManager defaultManager] fileExistsAtPath:fileFromResourceDirectory];
-	
-	// Check if the file exists in the Documents directory
-	NSString *documentsDirectoryPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) objectAtIndex:0];
-	NSString *fileFromDocumentsDirectory = [documentsDirectoryPath stringByAppendingPathComponent:filename];
-	BOOL doesFileResideInDocumentsDirectory = [[NSFileManager defaultManager] fileExistsAtPath:fileFromDocumentsDirectory];
-	
-	// Check if the file exists in the Temporary directory
-	NSString *fileFromTemporaryDirectory = [NSTemporaryDirectory() stringByAppendingPathComponent:filename];
-	BOOL doesFileResideInTemporaryDirectory = [[NSFileManager defaultManager] fileExistsAtPath:fileFromTemporaryDirectory];
-	
-	// Check if the file exists in the Caches directory
-	NSString *cachespath = [NSSearchPathForDirectoriesInDomains( NSCachesDirectory, NSUserDomainMask, YES) objectAtIndex:0];
-	NSString *fileFromCachesDirectory = [cachespath stringByAppendingString:[NSString stringWithFormat:@"/caches/%@", filename]];
-	BOOL doesFileResideInCachesDirectory = [[NSFileManager defaultManager] fileExistsAtPath:fileFromCachesDirectory];
+	// If there is a listener
+	if ( self.listenerRef )
+	{
+		// Filename of the current item
+		NSString *fileName = [[self.fileCache objectForKey:@"fileName"] objectAtIndex:controller.currentPreviewItemIndex];
+		// Base directory of the current item
+		void *baseDir = [[[self.fileCache objectForKey:@"baseDir"] objectAtIndex:controller.currentPreviewItemIndex] pointerValue];
 
-	// If the file exists in the Resource Directory
-	if ( doesFileResideInResourceDirectory )
-	{
-		directoryPath = "ResourceDirectory";
-		//printf( "%s resides in resource directory\n", [filename UTF8String] );
-	}
-	
-	// If the file exists in the Documents Directory
-	if ( doesFileResideInDocumentsDirectory )
-	{
-		directoryPath = "DocumentsDirectory";
-		//printf( "%s resides in documents directory\n", [filename UTF8String] );
-	}
-	
-	// If the file exists in the Temporary Directory
-	if ( doesFileResideInTemporaryDirectory )
-	{
-		directoryPath = "TemporaryDirectory";
-		//printf( "%s resides in temporary directory\n", [filename UTF8String] );
-	}
-	
-	// If the file exists in the Caches Directory
-	if ( doesFileResideInCachesDirectory )
-	{
-		directoryPath = "CachesDirectory";
-		//printf( "%s resides in caches directory\n", [filename UTF8String] );
-	}
-	
-	// Create the event
-	CoronaLuaNewEvent( self.luaState, CoronaEventPopupName() ); // event.name
-	lua_pushstring( self.luaState, "quickLook" ); // event.type
-	lua_setfield( self.luaState, -2, CoronaEventTypeKey() );
-	lua_pushstring( self.luaState, "done" ); // action type
-	lua_setfield( self.luaState, -2, "action" ); // event.action
+		// Create the event
+		CoronaLuaNewEvent( self.luaState, CoronaEventPopupName() ); // event.name
+		lua_pushstring( self.luaState, "quickLook" ); // event.type
+		lua_setfield( self.luaState, -2, CoronaEventTypeKey() );
+		lua_pushstring( self.luaState, "done" ); // action type
+		lua_setfield( self.luaState, -2, "action" ); // event.action
 
-	// If directoryPath isn't NULL
-	if ( directoryPath )
-	{
 		// event.file table
 		lua_newtable( self.luaState );
-		
+
 		// filename
-		lua_pushstring( self.luaState, [filename UTF8String] );
+		lua_pushstring( self.luaState, [fileName UTF8String] );
 		lua_setfield( self.luaState, -2, "filename" );
-		
-		// baseDir
-		lua_getglobal( self.luaState, "system" );
-		lua_getfield( self.luaState, -1, directoryPath );
-		lua_setfield( self.luaState, -3, "baseDir" );
-		lua_pop( self.luaState, 1 ); // Pop the system table
+
+		// Basedir
+		lua_pushlightuserdata( self.luaState, baseDir );
+		lua_setfield( self.luaState, -2, "baseDir" );
 		lua_setfield( self.luaState, -2, "file" ); // event.file (table)
-	}
+
+		// Dispatch the event
+		CoronaLuaDispatchEvent( self.luaState, self.listenerRef, 1 );
+
+		// Free native reference to listener
+		CoronaLuaDeleteRef( self.luaState, self.listenerRef );
+
+		// Null the reference
+		self.listenerRef = NULL;
 	
-	// Dispatch the event
-	CoronaLuaDispatchEvent( self.luaState, self.listenerRef, 1 );
-				
-	// Free native reference to listener
-	CoronaLuaDeleteRef( self.luaState, self.listenerRef );
-		
-	// Null the reference
-	self.listenerRef = NULL;
+		// Free the fileCache dictionary
+		[self.fileCache release];
+		self.fileCache = nil;
+	}
 }
 
 @end

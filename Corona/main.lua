@@ -8,6 +8,7 @@
 --
 -- Demonstrates how to use Corona to preview items with the iOS Quick Look controller
 
+-- Require the Widget library
 local widget = require( "widget" )
 
 -- Display a background
@@ -20,7 +21,7 @@ local function quickLookListener( event )
 	print( "name: ", event.name )
 	print( "action: ", event.action )
 	print( "type: ", event.type )
-
+	
 	-- event.file, filename and baseDir of the last file previewed
 	if "table" == type( event.file ) then
 		print( "event.file: {" )
@@ -44,10 +45,10 @@ local popupOptions =
 {
 	files = -- Files you wish to load into the quick look preview
 	{ 
-		{ filename = "sampleFiles/PDF Document.pdf", baseDir = system.ResourceDirectory },
-		{ filename = "sampleFiles/Image Document.jpg", baseDir = system.ResourceDirectory },
-		{ filename = "sampleFiles/HTML Document.html", baseDir = system.ResourceDirectory },
-		{ filename = "sampleFiles/Text Document.txt", baseDir = system.ResourceDirectory },
+		{ filename = "sampleFiles/PDF_File.pdf", baseDir = system.ResourceDirectory },
+		{ filename = "sampleFiles/Image_File.jpg", baseDir = system.ResourceDirectory },
+		{ filename = "sampleFiles/HTML_File.html", baseDir = system.ResourceDirectory },
+		{ filename = "sampleFiles/Text_File.txt", baseDir = system.ResourceDirectory },
 	},
 	startIndex = 1, -- The file you wish to start the preview at. Defaults is 1 (if omitted).
 	listener = quickLookListener, -- Callback listener
