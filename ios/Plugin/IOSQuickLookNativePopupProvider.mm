@@ -302,12 +302,39 @@ IOSQuickLookNativePopupProvider::showPopup( lua_State *L )
 			baseDirectories = nil;
 			filePaths = nil;
 
-			// Create a QLPreviewController instance
-			QLPreviewController *previewController = [[QLPreviewController alloc] init];
-			previewController.delegate = delegate;
-			previewController.dataSource = delegate;
-			previewController.currentPreviewItemIndex = startIndex;
-			[appViewController presentModalViewController:previewController animated:YES];
+			// If there is at least one object in the filePath array (that can be displayed)
+			if ( [[delegate.fileCache objectForKey:@"filePath"] count] >= 1 )
+			{
+				// Create a QLPreviewController instance
+				QLPreviewController *previewController = [[QLPreviewController alloc] init];
+				previewController.delegate = delegate;
+				previewController.dataSource = delegate;
+				previewController.currentPreviewItemIndex = startIndex;
+				[appViewController presentModalViewController:previewController animated:YES];
+			}
+			// No valid items in the array, call listener with "failed" action
+			else
+			{
+				// Create the event
+				CoronaLuaNewEvent( L, CoronaEventPopupName() ); // event.name
+				lua_pushstring( L, "quickLook" ); // event.type
+				lua_setfield( L, -2, CoronaEventTypeKey() );
+				lua_pushstring( L, "failed" ); // action type
+				lua_setfield( L, -2, "action" ); // event.action
+				
+				// Dispatch the event
+				CoronaLuaDispatchEvent( L, delegate.listenerRef, 1 );
+
+				// Free native reference to listener
+				CoronaLuaDeleteRef( L, delegate.listenerRef );
+
+				// Null the reference
+				delegate.listenerRef = NULL;
+				
+				// Free the fileCache dictionary
+				[delegate.fileCache release];
+				delegate.fileCache = nil;
+			}
 		}
 		else
 		{
