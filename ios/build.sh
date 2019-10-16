@@ -42,7 +42,7 @@ mkdir -p "$OUTPUT_DIR"
 checkError
 
 # iOS
-xcodebuild -project "$path/Plugin.xcodeproj" -target $TARGET -configuration $CONFIG
+xcodebuild -project "$path/Plugin.xcodeproj" -target $TARGET -configuration $CONFIG -sdk iphoneos
 checkError
 
 # Xcode Simulator

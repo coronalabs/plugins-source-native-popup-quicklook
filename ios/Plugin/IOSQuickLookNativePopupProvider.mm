@@ -24,125 +24,13 @@
 >
 
 @property (nonatomic, assign) lua_State *luaState; // Pointer to the current Lua state
-@property (nonatomic) Corona::Lua::Ref listenerRef; // Reference to store our listener (callback) function
+@property (nonatomic) CoronaLuaRef listenerRef; // Reference to store our listener (callback) function
 @property (nonatomic, assign) NSMutableDictionary *fileCache; // Dictionary to store filePath's/baseDir etc.
 @end
 
 @class CoronaQuickLookDelegate;
 
-// ----------------------------------------------------------------------------
-
-namespace Corona
-{
-
-// ----------------------------------------------------------------------------
-
-class IOSQuickLookNativePopupProvider
-{
-	public:
-		typedef IOSQuickLookNativePopupProvider Self;
-
-	public:
-		static int Open( lua_State *L );
-		static int Finalizer( lua_State *L );
-		static Self *ToLibrary( lua_State *L );
-
-	protected:
-		IOSQuickLookNativePopupProvider();
-		bool Initialize( void *platformContext );
-
-	public:
-		UIViewController* GetAppViewController() const { return fAppViewController; }
-	
-	public:
-		static int canShowPopup( lua_State *L );
-		static int showPopup( lua_State *L );
-
-	private:
-		UIViewController *fAppViewController;
-};
-
-// ----------------------------------------------------------------------------
-
 static const char kPopupName[] = "quickLook";
-static const char kMetatableName[] = __FILE__; // Globally unique value
-
-int
-IOSQuickLookNativePopupProvider::Open( lua_State *L )
-{
-	CoronaLuaInitializeGCMetatable( L, kMetatableName, Finalizer );
-	void *platformContext = CoronaLuaGetContext( L );
-
-	const char *name = lua_tostring( L, 1 ); CORONA_ASSERT( 0 == strcmp( kPopupName, name ) );
-	int result = CoronaLibraryProviderNew( L, "native.popup", name, "com.coronalabs" );
-
-	if ( result > 0 )
-	{
-		int libIndex = lua_gettop( L );
-
-		Self *library = new Self;
-
-		if ( library->Initialize( platformContext ) )
-		{
-			static const luaL_Reg kFunctions[] =
-			{
-				{ "canShowPopup", canShowPopup },
-				{ "showPopup", showPopup },
-
-				{ NULL, NULL }
-			};
-
-			// Register functions as closures, giving each access to the
-			// 'library' instance via ToLibrary()
-			{
-				lua_pushvalue( L, libIndex ); // push library
-				CoronaLuaPushUserdata( L, library, kMetatableName ); // push library ptr
-				luaL_openlib( L, NULL, kFunctions, 1 );
-				lua_pop( L, 1 ); // pop library
-			}
-		}
-	}
-
-	return result;
-}
-
-int
-IOSQuickLookNativePopupProvider::Finalizer( lua_State *L )
-{
-	Self *library = (Self *)CoronaLuaToUserdata( L, 1 );
-	delete library;
-	return 0;
-}
-
-IOSQuickLookNativePopupProvider::Self *
-IOSQuickLookNativePopupProvider::ToLibrary( lua_State *L )
-{
-	// library is pushed as part of the closure
-	Self *library = (Self *)CoronaLuaToUserdata( L, lua_upvalueindex( 1 ) );
-	return library;
-}
-
-// ----------------------------------------------------------------------------
-
-IOSQuickLookNativePopupProvider::IOSQuickLookNativePopupProvider()
-:	fAppViewController( nil )
-{
-}
-
-bool
-IOSQuickLookNativePopupProvider::Initialize( void *platformContext )
-{
-	bool result = ( ! fAppViewController );
-
-	if ( result )
-	{
-		id<CoronaRuntime> runtime = (id<CoronaRuntime>)platformContext;
-		fAppViewController = runtime.appViewController; // TODO: Should we retain?
-	}
-
-	return result;
-}
-
 
 // Is the previewController available?
 static bool
@@ -153,8 +41,7 @@ isPreviewControllerAvailable()
 
 
 // [Lua] native.canShowPopup
-int
-IOSQuickLookNativePopupProvider::canShowPopup( lua_State *L )
+static int preview_canShowPopup( lua_State *L )
 {
 	lua_pushboolean( L, isPreviewControllerAvailable() );
 	return 1;
@@ -162,21 +49,15 @@ IOSQuickLookNativePopupProvider::canShowPopup( lua_State *L )
 
 
 // [Lua] native.showPopup
-int
-IOSQuickLookNativePopupProvider::showPopup( lua_State *L )
+static int preview_showPopup( lua_State *L )
 {
-	using namespace Corona;
-
-	Self *context = ToLibrary( L );
-
 	// The result
 	int result = 0;
+	id<CoronaRuntime> runtime = (id<CoronaRuntime>)CoronaLuaGetContext( L );
 
 	// If the controller is available
-	if ( context && isPreviewControllerAvailable() )
+	if ( isPreviewControllerAvailable() )
 	{
-		Self& library = * context;
-
 		// Create an instance of our delegate
 		CoronaQuickLookDelegate *delegate = [[CoronaQuickLookDelegate alloc] init];
 
@@ -184,7 +65,7 @@ IOSQuickLookNativePopupProvider::showPopup( lua_State *L )
 		delegate.luaState = L;
 
 		// Assign our runtime view controller
-		UIViewController *appViewController = library.GetAppViewController();
+		UIViewController *appViewController = runtime.appViewController;
 
 		// Initialize our fileCache dictionary
 		delegate.fileCache = [[NSMutableDictionary alloc] init];
@@ -201,7 +82,7 @@ IOSQuickLookNativePopupProvider::showPopup( lua_State *L )
 			lua_getfield( L, 2, "listener" );
 
 			// Set the delegates listenerRef to reference the onComplete function (if it exists)
-			if ( Lua::IsListener( L, -1, kPopupName ) )
+			if ( CoronaLuaIsListener( L, -1, kPopupName ) )
 			{
 				//printf( "Registered listener\n" );
 				delegate.listenerRef = CoronaLuaNewRef( L, -1 );
@@ -215,7 +96,7 @@ IOSQuickLookNativePopupProvider::showPopup( lua_State *L )
 			// If this is a table
 			if ( lua_istable( L, -1 ) )
 			{
-				int numOfFiles = lua_objlen( L, -1 );
+				size_t numOfFiles = lua_objlen( L, -1 );
 				//printf( "Num tables is: %d\n", numOfFiles );
 
 				if ( numOfFiles > 0 )
@@ -275,7 +156,7 @@ IOSQuickLookNativePopupProvider::showPopup( lua_State *L )
 			lua_pop( L, 2 ); // Pop startIndex key & options table
 			
 			// Ensure we can preview all items passed from the [lua] file table.
-			for ( int i = 0; i < [fileNames count]; i ++ )
+			for ( long i = [fileNames count] -1 ; i >=0 ; i -- )
 			{
 				// File path to the current item
 				NSString *currentItemPath = [fileNames objectAtIndex:i];
@@ -310,7 +191,7 @@ IOSQuickLookNativePopupProvider::showPopup( lua_State *L )
 				previewController.delegate = delegate;
 				previewController.dataSource = delegate;
 				previewController.currentPreviewItemIndex = startIndex;
-				[appViewController presentModalViewController:previewController animated:YES];
+				[appViewController presentViewController:previewController animated:YES completion:nil];
 			}
 			// No valid items in the array, call listener with "failed" action
 			else
@@ -344,10 +225,6 @@ IOSQuickLookNativePopupProvider::showPopup( lua_State *L )
 
 	return result;
 }
-
-// ----------------------------------------------------------------------------
-
-} // namespace Corona
 
 // ----------------------------------------------------------------------------
 
@@ -426,12 +303,29 @@ IOSQuickLookNativePopupProvider::showPopup( lua_State *L )
 
 @end
 
-// Export
-
 CORONA_EXPORT
 int luaopen_CoronaProvider_native_popup_quickLook( lua_State *L )
 {
-	return Corona::IOSQuickLookNativePopupProvider::Open( L );
+	const char *name = lua_tostring( L, 1 ); CORONA_ASSERT( 0 == strcmp( kPopupName, name ) );
+	int result = CoronaLibraryProviderNew( L, "native.popup", name, "com.coronalabs" );
+	if ( result > 0 )
+	{
+		static const luaL_Reg kFunctions[] =
+		{
+			{ "canShowPopup", preview_canShowPopup },
+			{ "showPopup", preview_showPopup },
+
+			{ NULL, NULL }
+		};
+		
+		for (const luaL_Reg *l = kFunctions; l->name != NULL; l++)
+		{
+			lua_pushcfunction(L, l->func);
+			lua_setfield(L, -2, l->name);
+		}
+	}
+
+	return result;
 }
 
 // ----------------------------------------------------------------------------
