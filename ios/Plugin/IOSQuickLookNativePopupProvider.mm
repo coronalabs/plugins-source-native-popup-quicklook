@@ -159,7 +159,7 @@ static int preview_showPopup( lua_State *L )
 			for ( long i = [fileNames count] -1 ; i >=0 ; i -- )
 			{
 				// File path to the current item
-				NSString *currentItemPath = [fileNames objectAtIndex:i];
+				NSString *currentItemPath = [filePaths objectAtIndex:i];
 
 				// If we can't display the current item, remove it from our lists
 				if ( ! [QLPreviewController canPreviewItem:[NSURL fileURLWithPath:currentItemPath]] )
